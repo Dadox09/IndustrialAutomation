@@ -1,0 +1,64 @@
+Assignment: Sustainable Offshore Wind Installation
+— MILP vs. Dynamic Programming
+Industrial Systems Optimization & Marine Renewable Energy
+Academic Year 2026
+Problem Overview
+The deployment of offshore wind farms is a race against time and nature. This assignment
+requires you to optimize the sequence of installation tasks for a single Heavy-Lift Vessel
+(HLV). You must balance theFuel Consumptioncaused by sequence-dependent setups
+(ballasting and positioning) against theCarbon Penaltyof missing weather-dependent
+installation windows.
+Manufacturing Context: The Offshore Wind Array
+The HLV installs three types of structures:Monopiles(M),Jackets(J), andTurbine
+Nacelles(N).
+•Sequence-Dependent Setups (Fuel Spike):Switching between Monopiles and
+Jackets requires a ”Major Ballast Shift” and crane re-rigging. This process con-
+sumes a significant amount of diesel fuel.
+•Weather Windows (Sustainability Penalty):Each site has a predicted ”Safe
+Sea State” window. If the HLV is tardy and misses this window, it must remain on-
+station in ”DP-Mode” (Dynamic Positioning), burning auxiliary fuel while waiting
+for the next window.
+•Environmental Weight (w j):Sites further offshore have higher weights because
+the logistics of supporting a delayed vessel there are more carbon-intensive.
+Tasks
+1. Database Construction (SQL)
+•Create aDeployment Scheduletable with:TaskID,StructureType,ProcTime,
+WeatherWindowEnd, andLogisticsWeight.
+•Implement aSetup Fuel Matrixstoring the metric tons of fuel consumed when
+switching between structure types.
+1
+2. Comparative Methodology
+Implement and compare the following two optimization methods:
+•Approach A (Mathematical Programming):Formulate a global MILP model.
+Use Big-M constraints to handle the sequence and a penalty function that accounts
+for the auxiliary fuel burn during idle periods (tardiness).
+•Approach B (Dynamic Programming):Implement a recursive DP approach.
+State: (S, i) is the minimum fuel cost for setSending with taski. Prune paths
+where the cumulative delay exceeds the vessel’s fuel capacity for idling.
+3. Sustainability Report
+Calculate the totalCO 2 saved by the optimized sequence compared to a simple ”Nearest-
+Neighbor” heuristic. Report on the trade-off between ”Moving Fast” (high setup cost)
+and ”Waiting” (tardiness penalty).
+2
+Deterministic Problem Instance
+Table 1: Installation Tasks
+Task ID Type Proc. Time (p j) Weight (w j) Weather Window (d j)
+Task 01 Monopile (M) 48 hours 10 (High) 100 hours
+Task 02 Jacket (J) 72 hours 8 (Med) 180 hours
+Task 03 Nacelle (N) 36 hours 12 (Critical) 120 hours
+Task 04 Monopile (M) 48 hours 10 (High) 250 hours
+Table 2: Sequence-Dependent Fuel Consumption (s ij in Fuel
+Units)
+Units represent the fuel cost to re-calibrate and move the HL V between tasks.
+From↓/ To→Monopile (M) Jacket (J) Nacelle (N) Monopile (M)
+Port Start20 30 25 20
+Monopile (M)- 50 30 5
+Jacket (J)60 - 40 60
+Nacelle (N)25 35 - 25
+The Environmental Penalty Function
+Tardiness is penalized based on the cost of ”Dynamic Positioning” (DP) idling:
+•IfC j ≤d j: Penalty = 0.
+•IfC j > d j: Penalty =w j ×(C j −d j) + Re-mobilization Cost.
+TheRe-mobilization Costis a fixed penalty applied if the vessel misses the weather
+window entirely, requiring it to retreat and return later.
+3

@@ -1,0 +1,77 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+
+\title{Assignment 2: Sustainable Offshore Wind Installation
+— MILP vs. Dynamic Programming}
+\author{Davide Rizzo and Marta Nasso}
+\date{April 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This report analyzes the scheduling problem for a Heavy-Lift Vessel (HLV) used in the installation of offshore wind turbines. The main goal is to optimize the sequence of installations by carefully balancing two contrasting environmental and economic factors:
+\begin{itemize}
+    \item \textbf{Setup Consumption:} The fuel consumed to recalibrate the vessel and move between different types of structures (e.g., from Monopile to Jacket).
+    \item \textbf{Idle DP-Mode Penalty:} The environmental and operational cost associated with missing the designated safety "Weather Windows". Failing to meet these ideal timeframes forces the vessel to operate in a state of prolonged inactivity by hovering on-site (Dynamic Positioning), which burns huge amounts of auxiliary fuel.
+\end{itemize}
+This problem highlights a clear logistical \textit{trade-off}: prioritizing movement speed to mitigate setup costs, versus waiting strategically to meet deadlines and reduce the massive idling penalties.
+
+\section{Methodologies Implemented}
+Three different scheduling methodologies were developed, formulated, and tested:
+\begin{enumerate}
+    \item \textbf{Mixed-Integer Linear Programming (MILP):} An exact mathematical formulation (Approach A). The sequencing constraints and the continuous accumulation of tardiness penalties were modeled and linearized using the classic Big-M approaches of Operations Research.
+    \item \textbf{Dynamic Programming (DP):} An exact resolution approach (Approach B) based on recursion. The optimal path at each stage stores historical aggregate data. To efficiently handle sequence-dependent setups, the algorithm tracks specific "Pareto frontiers" made of \textit{non-dominated} combinations of completion time and their related cumulative cost.
+    \item \textbf{Nearest-Neighbor Heuristic (NN):} An iterative, greedy approximation approach. Starting from the initial port, the vessel always seeks the consecutive task with the lowest setup cost vector, completely ignoring the environmental criticality of weather deadlines.
+\end{enumerate}
+
+\section{Computational Results}
+The analyzed instance interfaces with the \texttt{offshore\_wind.db} database and lists a schedule of 4 heterogeneous construction sites: two Monopiles (M), one Jacket (J), and one Nacelle (N).
+
+\subsection{Performance and Algorithmic Excellence}
+The execution of the \textit{Nearest-Neighbor Heuristic} quickly scanned a partial solution space, providing the following ordered sequence:\\
+\centerline{\textbf{Task\_01(M) $\rightarrow$ Task\_04(M) $\rightarrow$ Task\_03(N) $\rightarrow$ Task\_02(J)}}
+
+The "short-sighted" logic of this algorithm favors rapid movement while ignoring the closure of upcoming weather windows. Despite this, the exact solvers (MILP and DP structures), by evaluating the full scope of the schedule, globally recalculate the actual trade-off to minimize the vessel's energy dispersion.
+
+\begin{table}[h!]
+\centering
+\resizebox{\textwidth}{!}{
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Cost Component (Fuel Units)} & \textbf{NN Heuristic} & \textbf{Optimal Method (MILP / DP)} \\ \midrule
+Setup Consumption  (Vessel Movement)            & 90.00                     & 105.00                       \\
+DPM Penalty (Tardiness + Remobilization)  & 2716.00                   & 2372.00                      \\ \midrule
+\textbf{Total Fuel Consumption}      & \textbf{2806.00}          & \textbf{2477.00}             \\ \bottomrule
+\end{tabular}
+}
+\caption{Comparison of estimated fuel consumption across computational models.}
+\end{table}
+
+\section{Sustainability Report}
+The core focus of this scientific report aims to numerically parameterize the benefits of quantitatively limiting pollutant emissions (\textit{Carbon-Penalty proxy}) through the mathematical optimization of maritime protocols.
+
+\paragraph{Trade-off Analysis:} 
+The greedy heuristic pushes the concept of "\textit{Moving Fast}" to the extreme: it acts precisely to minimize setups, smoothly reaching the lower boundary of only \textbf{$90.00$} Fuel Units. However, conceptual weaknesses cause it to ignore the criticality of the logistics weight ($w_j$). This leads to schedule saturation and forces the machinery into difficult operations, triggering a massive penalty due to the prolonged, heavy use of DP modules (\textbf{$2716.00$} units).
+
+Through algorithmic synergy, the MILP (exactly matching the DP) grasps the inherently virtuous nature of "\textit{Waiting}": it favors an apparent worsening of maneuvers and infrastructural shift consumption (\textbf{$105.00$} units consumed). Fortunately, this is enough to guarantee a proper deployment within the predictable constraints, slashing the enormous idling penalties down to just \textbf{$2372.00$}.
+
+\paragraph{Ecological Impact ($CO_2$ Savings):}
+The breakeven reporting demonstrates that competitive and optimal sequencing guarantees this industrial system a formal saving of \textbf{329.00 Fuel Units}.
+If we interpret Fuel Units as a fair metric for carbon dioxide emissions and logistic hydrocarbon consumption, adopting the orchestration of the exact approach allows for significant supply chain decarbonization, staying true to ecosystem sustainability commitments.
+
+\begin{figure}[h!]
+    \centering
+    % Remember to upload the 'sustainability_plot.png' image to Overleaf %
+    \includegraphics[width=0.8\textwidth]{sustainability_plot.png}
+    \caption{Bar-chart visualization of the ``Moving Fast'' vs ``Waiting'' Trade-Off.}
+    \label{fig:sustainability}
+\end{figure}
+
+\end{document}
