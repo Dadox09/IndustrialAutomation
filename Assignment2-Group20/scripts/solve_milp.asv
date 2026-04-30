@@ -46,6 +46,7 @@ end
 % Re-mobilization fixed cost (fuel units) if a task misses its window
 RemobCost = 100;
 
+% Big-M constant (same style the professor uses)
 M = 10000;
 
 fprintf('Number of tasks n = %d\n',n);
@@ -53,11 +54,10 @@ fprintf('Processing times p = [%s]\n',num2str(p'));
 fprintf('Weather windows d = [%s]\n',num2str(d'));
 fprintf('Weights         w = [%s]\n',num2str(w'));
 fprintf('Port setup      = [%s]\n',num2str(port_setup'));
-fprintf('\nSetup matrix S (n x n):\n');
-disp(S);  
-fprintf('\nFuel matrix F (raw table):\n');
-disp(F);
 
+F
+port_setup
+S
 
 
 %% -------------------------------------------------------------
