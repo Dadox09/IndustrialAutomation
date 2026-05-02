@@ -44,7 +44,7 @@ for j = 1:n
 end
 
 % Re-mobilization fixed cost (fuel units) if a task misses its window
-RemobCost = 100;
+fixedCost = 100;
 
 M = 10000;
 
@@ -71,32 +71,32 @@ s    = optimvar('s',n,1,'LowerBound',0);
 % completion time for each task
 c    = optimvar('c',n,1,'LowerBound',0);
 % tardiness (>=0)
-Tvar = optimvar('T',n,1,'LowerBound',0);
+Tardiness = optimvar('T',n,1,'LowerBound',0);
 % x(i,j) = 1 if task i is immediately before task j
 x    = optimvar('x',n,n,'Type','integer','LowerBound',0,'UpperBound',1);
 % y(j) = 1 if task j is the FIRST scheduled after Port
 y    = optimvar('y',n,1,'Type','integer','LowerBound',0,'UpperBound',1);
 % late(j) = 1 if task j violates its weather window
-late = optimvar('late',n,1,'Type','integer','LowerBound',0,'UpperBound',1);
+penalty = optimvar('penalty',n,1,'Type','integer','LowerBound',0,'UpperBound',1);
 
 %% -------------------------------------------------------------
 %  3) OBJECTIVE (fuel: setup + tardiness penalty + remobilization)
 %  -------------------------------------------------------------
 setupFromPort = sum(port_setup .* y);
 
-setupBetween  = optimexpr(1,1);   % scalar expression we will accumulate
+setupBetweenTasks  = optimexpr(1,1);   
 for i = 1:n
     for j = 1:n
         if i ~= j
-            setupBetween = setupBetween + S(i,j)*x(i,j);
+            setupBetweenTasks = setupBetweenTasks + S(i,j)*x(i,j);
         end
     end
 end
 
-tardinessCost = sum(w .* Tvar);
-remobCost     = sum(RemobCost .* late);
+tardinessCost = sum(w .* Tardiness);
+penaltyCost     = sum(fixedCost .* penalty);
 
-prob.Objective = setupFromPort + setupBetween + tardinessCost + remobCost;
+prob.Objective = setupFromPort + setupBetweenTasks + tardinessCost + penaltyCost;
 
 %% -------------------------------------------------------------
 %  4) CONSTRAINTS
@@ -150,85 +150,117 @@ prob.Constraints.cons6 = cons6;
 % C7: tardiness definition
 cons7 = optimconstr(n);
 for j = 1:n
-    cons7(j) = Tvar(j) >= c(j) - d(j);
+    cons7(j) = Tardiness(j) >= c(j) - d(j);
 end
 prob.Constraints.cons7 = cons7;
 
-% C8: linking "late" binary to tardiness (fixed remobilization cost)
+% C8: penalty with tardiness
 cons8 = optimconstr(n);
 for j = 1:n
-    cons8(j) = c(j) - d(j) <= M * late(j);
+    cons8(j) = c(j) - d(j) <= M * penalty(j);
 end
 prob.Constraints.cons8 = cons8;
 
 %% -------------------------------------------------------------
 %  5) SOLVE
 %  -------------------------------------------------------------
-opts = optimoptions('intlinprog','Display','off');
-[xopt, totalCost, exitflag] = solve(prob,'Options',opts);
+[xopt, totalCost] = solve(prob);
 
-if exitflag <= 0
-    error('MILP did not find a feasible/optimal solution (exitflag=%d).',exitflag);
-end
+disp(xopt)
+disp(xopt.T)
+disp(xopt.c)
+
+[~, sequence] = sort(xopt.c);
+fprintf('\nSequence: %s\n', strjoin(string(sequence'),' -> '));
 
 %% -------------------------------------------------------------
-%  6) DECODE SEQUENCE FROM x, y
+%  6) GANTT CHART
 %  -------------------------------------------------------------
-xSol    = round(xopt.x);
-ySol    = round(xopt.y);
-cSol    = xopt.c;
-TSol    = xopt.T;
-lateSol = round(xopt.late);
+sVal = xopt.s;          % start times
+cVal = xopt.c;          % completion times
 
-sequence = zeros(1,n);
-sequence(1) = find(ySol == 1, 1);        % first task
-for k = 2:n
-    prev = sequence(k-1);
-    nxt  = find(xSol(prev,:) == 1, 1);
-    if isempty(nxt)
-        error('Broken chain: no successor found after task %d',prev);
+% Colors
+colSetup   = [0.85 0.55 0.20];   % orange  -> setup (port + inter-task)
+colProcess = [0.20 0.55 0.85];   % blue    -> processing
+colLate    = [0.85 0.20 0.20];   % red     -> tardiness portion
+
+figure('Name','MILP Gantt Chart','Color','w');
+hold on;
+
+nSeq = numel(sequence);
+yHeight = 0.6;          % bar thickness
+
+for k = 1:nSeq
+    j = sequence(k);    % task index in scheduled order
+    yPos = nSeq - k + 1;   % top-down layout (first task on top)
+
+    % --- (a) setup bar BEFORE task j ---
+    if k == 1
+        setupStart = 0;
+        setupDur   = port_setup(j);
+        setupLabel = sprintf('Port->%s', types(j));
+    else
+        iPrev      = sequence(k-1);
+        setupStart = cVal(iPrev);
+        setupDur   = S(iPrev, j);
+        setupLabel = sprintf('%s->%s', types(iPrev), types(j));
     end
-    sequence(k) = nxt;
+    if setupDur > 0
+        rectangle('Position',[setupStart, yPos-yHeight/2, setupDur, yHeight], ...
+                  'FaceColor', colSetup, 'EdgeColor','k');
+        text(setupStart + setupDur/2, yPos, setupLabel, ...
+             'HorizontalAlignment','center','VerticalAlignment','middle', ...
+             'FontSize',8,'Color','k');
+    end
+
+    % --- (b) processing bar (s(j) -> c(j)) ---
+    procStart = sVal(j);
+    procDur   = p(j);
+
+    % split processing into on-time and tardy portion (visual)
+    if cVal(j) <= d(j)
+        rectangle('Position',[procStart, yPos-yHeight/2, procDur, yHeight], ...
+                  'FaceColor', colProcess, 'EdgeColor','k');
+    else
+        onTimeDur = max(0, d(j) - procStart);
+        lateDur   = procDur - onTimeDur;
+        if onTimeDur > 0
+            rectangle('Position',[procStart, yPos-yHeight/2, onTimeDur, yHeight], ...
+                      'FaceColor', colProcess, 'EdgeColor','k');
+        end
+        rectangle('Position',[procStart + onTimeDur, yPos-yHeight/2, lateDur, yHeight], ...
+                  'FaceColor', colLate, 'EdgeColor','k');
+    end
+    text(procStart + procDur/2, yPos, sprintf('T%d (%s)', j, types(j)), ...
+         'HorizontalAlignment','center','VerticalAlignment','middle', ...
+         'FontSize',9,'FontWeight','bold','Color','w');
+
+    % --- (c) deadline marker d(j) ---
+    plot([d(j) d(j)], [yPos-yHeight/2, yPos+yHeight/2], ...
+         'k--','LineWidth',1.2);
+    text(d(j), yPos+yHeight/2 + 0.05, sprintf('d=%g', d(j)), ...
+         'HorizontalAlignment','center','VerticalAlignment','bottom', ...
+         'FontSize',7,'Color','k');
 end
 
-%% -------------------------------------------------------------
-%  7) COST BREAKDOWN
-%  -------------------------------------------------------------
-setupFromPortVal = port_setup(sequence(1));
-setupBetweenVal  = 0;
-for k = 1:n-1
-    setupBetweenVal = setupBetweenVal + S(sequence(k),sequence(k+1));
-end
-tardinessVal = sum(w .* TSol);
-remobVal     = sum(RemobCost .* lateSol);
+% Axes / labels
+yticks(1:nSeq);
+yticklabels(arrayfun(@(k) sprintf('Slot %d (T%d)', k, sequence(k)), ...
+            nSeq:-1:1, 'UniformOutput', false));
+xlabel('Time (h)');
+ylabel('Schedule order');
+title(sprintf('Optimal Schedule  |  Total fuel cost = %.2f', totalCost));
+grid on; box on;
+xlim([0, max(cVal) * 1.10]);
+ylim([0.3, nSeq + 0.7]);
 
-breakdown.setupFromPort = setupFromPortVal;
-breakdown.setupBetween  = setupBetweenVal;
-breakdown.tardiness     = tardinessVal;
-breakdown.remobilization= remobVal;
-breakdown.completionTimes = cSol;
-breakdown.tardinessPerTask= TSol;
+% Legend (dummy patches)
+hSetup   = patch(NaN,NaN,colSetup);
+hProc    = patch(NaN,NaN,colProcess);
+hLate    = patch(NaN,NaN,colLate);
+hDead    = plot(NaN,NaN,'k--','LineWidth',1.2);
+legend([hSetup hProc hLate hDead], ...
+       {'Setup (port / inter-task)','Processing','Tardy portion','Deadline d_j'}, ...
+       'Location','southoutside','Orientation','horizontal');
 
-%% -------------------------------------------------------------
-%  8) REPORT
-%  -------------------------------------------------------------
-fprintf('\n========== MILP SOLUTION ==========\n');
-fprintf('Optimal sequence : ');
-for k = 1:n
-    fprintf('Task_%02d(%s)',sequence(k),types(sequence(k)));
-    if k<n, fprintf(' -> '); end
-end
-fprintf('\n');
-fprintf('Completion times : [%s]\n', num2str(cSol'));
-fprintf('Weather windows  : [%s]\n', num2str(d'));
-fprintf('Tardiness (h)    : [%s]\n', num2str(TSol'));
-fprintf('Late indicators  : [%s]\n', num2str(lateSol'));
-fprintf('--- Cost breakdown (fuel units) ---\n');
-fprintf('  Setup from Port      = %8.2f\n', setupFromPortVal);
-fprintf('  Setup between tasks  = %8.2f\n', setupBetweenVal);
-fprintf('  Tardiness penalty    = %8.2f\n', tardinessVal);
-fprintf('  Remobilization fixed = %8.2f\n', remobVal);
-fprintf('  TOTAL (objective)    = %8.2f\n', totalCost);
-fprintf('====================================\n');
-
-end
+hold off;
