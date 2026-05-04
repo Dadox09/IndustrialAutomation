@@ -36,7 +36,7 @@ for j = 1:n
     end
 end
 
-RemobCost = 500;
+RemobCost = 100;
 
 % ALGORITHM: Nearest Neighbor
 unvisited = 1:n;

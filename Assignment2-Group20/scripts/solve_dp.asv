@@ -1,21 +1,20 @@
 function [sequence, totalCost, breakdown] = solve_dp()
 %
-% APPROACH B - Dynamic Programming (BACKWARD induction, prof's style)
+% APPROACH B - Dynamic Programming (Held-Karp on subsets)
 %
-% Mirrors the structure of principale.m:
-%   passo n  -> base case (V = 0 when all jobs done)
-%   passo k  -> backward recursion, k = n-1 .. 1
-%   passo 0  -> initial state (Port)
+% State : (S, i)  -> S = subset of already-scheduled tasks
+%                    i = last task in S (needed for sequence-dependent setup)
+% Value : G{k}(rowIdx, i) = min cumulative fuel cost (setup + tardiness + remob.)
+%                           to complete subset S = X{k}(rowIdx,:) ending with task i.
+% Stages: k = |S| from 1..n.  Subsets per stage are enumerated with combnk,
+%         following the layout used by the professor's principale.m / principale2.m.
 %
-% State: (S, last, t)
-%   S    = subset of jobs already scheduled  (size k)
-%   last = last task in S (needed because setup is sequence-dependent)
-%   t    = completion time of last on the path that produced this state
 % Output:
 %   sequence   : ordered list of task indices (1..n)
 %   totalCost  : optimal objective value (fuel units)
 %   breakdown  : struct with setup / tardiness / remobilization components
 
+clear
 clc
 
 %% -------------------------------------------------------------
@@ -49,6 +48,7 @@ for j = 1:n
     end
 end
 
+% Fixed re-mobilization fuel cost when the weather window is missed
 fixedCost = 100;
 
 fprintf('Number of tasks n = %d\n',n);
@@ -56,151 +56,90 @@ fprintf('Processing times p = [%s]\n',num2str(p'));
 fprintf('Weather windows d = [%s]\n',num2str(d'));
 fprintf('Weights         w = [%s]\n',num2str(w'));
 fprintf('Port setup      = [%s]\n',num2str(port_setup'));
-fprintf('\nSetup matrix S (n x n):\n'); disp(S);
-fprintf('\nFuel matrix F (raw table):\n'); disp(F_fuel);
+fprintf('\nSetup matrix S (n x n):\n');
+disp(S);
+fprintf('\nFuel matrix F (raw table):\n');
+disp(F_fuel);
 
 %% -------------------------------------------------------------
-%  2) SUBSETS PER STAGE (prof: X1, X2, ...; combnk == nchoosek)
+%  2) DYNAMIC PROGRAMMING (forward, prof's combnk layout)
 %  -------------------------------------------------------------
+INF = 100000;
+
+% Costruzione grafo con combinazioni senza ordine
 X = cell(n,1);
 for k = 1:n
-    X{k} = nchoosek(1:n,k);   % equivalent to combnk(1:n,k)
+    X{k} = nchoosek(1:n,k);
 end
 
-%% -------------------------------------------------------------
-%  3) FORWARD PASS: enumerate reachable completion times per (S,last)
-%  -------------------------------------------------------------
-% Reach{k}{r,j} = sorted list of distinct completion times t at state
-% (X{k}(r,:), last = j) reachable from Port through any valid permutation.
-Reach = cell(n,1);
+
+% Cost / time / predecessor arrays per stage
+G    = cell(n,1);   % G{k}(r,i) = min cost to reach (X{k}(r,:),i)
+Gt   = cell(n,1);   % Gt{k}(r,i) = completion time of i on the optimal path
+Gpr  = cell(n,1);   % Gpr{k}(r,i) = predecessor task (0 = Port)
 for k = 1:n
-    Reach{k} = cell(size(X{k},1), n);
+    G{k}   = INF*ones(size(X{k},1),n);
+    Gt{k}  = INF*ones(size(X{k},1),n);
+    Gpr{k} = zeros(size(X{k},1),n);
 end
 
-% passo 1 (Port -> j)
+% --- Stage k = 1 : Port -> j ---------------------------------------------
 for r = 1:size(X{1},1)
-    j = X{1}(r,1);
-    Reach{1}{r,j} = port_setup(j) + p(j);
+    j   = X{1}(r,1);
+    cj  = port_setup(j) + p(j);
+    tard = max(0, cj - d(j));
+    pen  = w(j)*tard + fixedCost*(tard>0);
+    G{1}(r,j)   = port_setup(j) + pen;
+    Gt{1}(r,j)  = cj;
+    Gpr{1}(r,j) = 0;
 end
 
-% passi 2..n
+% --- Stages k = 2..n -----------------------------------------------------
 for k = 2:n
     for r = 1:size(X{k},1)
-        Sset = X{k}(r,:);
-        for j = Sset
-            prevSet = setdiff(Sset, j);
-            [~, rPrev] = ismember(prevSet, X{k-1}, 'rows');
-            ts = [];
-            for i = prevSet
-                Tprev = Reach{k-1}{rPrev, i};
-                if isempty(Tprev), continue; end
-                ts = [ts, Tprev + S(i,j) + p(j)]; 
-            end
-            Reach{k}{r,j} = unique(ts);
-        end
-    end
-end
-
-%% -------------------------------------------------------------
-%  4) BACKWARD DP : passo n  ->  passo 1
-%  -------------------------------------------------------------
-% V{k}{r,j}(ti)   = optimal cost-to-go from state (X{k}(r,:), last=j,
-%                   t=Reach{k}{r,j}(ti)) to complete the remaining jobs.
-% NXT{k}{r,j}(ti,:) = (rNext, jNext, tiNext) for forward reconstruction.
-V   = cell(n,1);
-NXT = cell(n,1);
-for k = 1:n
-    V{k}   = cell(size(X{k},1), n);
-    NXT{k} = cell(size(X{k},1), n);
-end
-
-% --- passo n : base case, V = 0 (all jobs already scheduled) -----------
-for j = 1:n
-    Tn = Reach{n}{1,j};
-    if isempty(Tn), continue; end
-    V{n}{1,j} = zeros(size(Tn));
-end
-
-% --- passo k = n-1 .. 1 : backward recursion ---------------------------
-for k = (n-1):-1:1
-    for r = 1:size(X{k},1)
-        Sset = X{k}(r,:);
-        Rset = setdiff(1:n, Sset);          % remaining (not yet done)
-        for j = Sset
-            Tj = Reach{k}{r,j};
-            if isempty(Tj), continue; end
-            V{k}{r,j}   = inf(size(Tj));
-            NXT{k}{r,j} = zeros(numel(Tj),3);
-            for ti = 1:numel(Tj)
-                t = Tj(ti);
-                bestC = inf; bestNext = [0 0 0];
-                for h = Rset                 % candidate next job
-                    nextSet = sort([Sset h]);
-                    [~, rNext] = ismember(nextSet, X{k+1}, 'rows');
-                    tnew = t + S(j,h) + p(h);
-                    tard = max(0, tnew - d(h));
-                    cIm  = S(j,h) + w(h)*tard + fixedCost*(tard>0);
-                    Tnext   = Reach{k+1}{rNext, h};
-                    tnextI  = find(Tnext == tnew, 1);
-                    if isempty(tnextI), continue; end
-                    if isinf(V{k+1}{rNext,h}(tnextI)), continue; end
-                    cTotal = cIm + V{k+1}{rNext,h}(tnextI);
-                    if cTotal < bestC
-                        bestC = cTotal; bestNext = [rNext, h, tnextI];
-                    end
+        Sset = X{k}(r,:);                          % current subset (size k)
+        for j = Sset                               % candidate last task
+            prevSet = setdiff(Sset,j);             % subset of size k-1
+            [~,rPrev] = ismember(prevSet, X{k-1}, 'rows');
+            for i = prevSet                        % candidate predecessor
+                if G{k-1}(rPrev,i) >= INF, continue; end
+                newT = Gt{k-1}(rPrev,i) + S(i,j) + p(j);
+                tard = max(0, newT - d(j));
+                pen  = w(j)*tard + fixedCost*(tard>0);
+                cost = G{k-1}(rPrev,i) + S(i,j) + pen;
+                if cost < G{k}(r,j)
+                    G{k}(r,j)   = cost;
+                    Gt{k}(r,j)  = newT;
+                    Gpr{k}(r,j) = i;
                 end
-                V{k}{r,j}(ti)     = bestC;
-                NXT{k}{r,j}(ti,:) = bestNext;
             end
         end
     end
 end
 
-%% -------------------------------------------------------------
-%  5) PASSO 0 : Port -> first job
-%  -------------------------------------------------------------
-bestCost  = inf;
-bestFirst = 0;
-bestR     = 0;
-bestTi    = 0;
-for j = 1:n
-    rFirst = find(X{1} == j);
-    t      = port_setup(j) + p(j);
-    tard   = max(0, t - d(j));
-    cIm    = port_setup(j) + w(j)*tard + fixedCost*(tard>0);
-    Tj     = Reach{1}{rFirst, j};
-    ti     = find(Tj == t, 1);
-    if isempty(ti) || isinf(V{1}{rFirst,j}(ti)), continue; end
-    cTotal = cIm + V{1}{rFirst,j}(ti);
-    if cTotal < bestCost
-        bestCost  = cTotal;
-        bestFirst = j;
-        bestR     = rFirst;
-        bestTi    = ti;
-    end
-end
-totalCost = bestCost;
-
-fprintf('\n[DP] Optimal cost = %.4f, first task = %d\n', totalCost, bestFirst);
+% --- Optimal terminal task on the full set -------------------------------
+[totalCost, lastTask] = min(G{n}(1,:));
+fprintf('\n[DP] Optimal cost = %.4f, terminal task = %d\n', totalCost, lastTask);
 
 %% -------------------------------------------------------------
-%  6) FORWARD RECONSTRUCTION OF SEQUENCE
+%  3) BACKTRACK -> sequence
 %  -------------------------------------------------------------
 sequence = zeros(1,n);
-curR = bestR; curJ = bestFirst; curTi = bestTi;
-for k = 1:n
-    sequence(k) = curJ;
-    if k < n
-        nxt   = NXT{k}{curR, curJ}(curTi,:);
-        curR  = nxt(1);
-        curJ  = nxt(2);
-        curTi = nxt(3);
+curTask  = lastTask;
+curRow   = 1;                                    % only one subset of size n
+for k = n:-1:1
+    sequence(k) = curTask;
+    prevTask = Gpr{k}(curRow,curTask);
+    if k > 1
+        prevSet = setdiff(X{k}(curRow,:), curTask);
+        [~,curRow] = ismember(prevSet, X{k-1}, 'rows');
     end
+    curTask = prevTask;
 end
 fprintf('Sequence: %s\n', strjoin(string(sequence),' -> '));
 
 %% -------------------------------------------------------------
-%  7) COST BREAKDOWN
+%  4) COST BREAKDOWN
 %  -------------------------------------------------------------
 sVal = zeros(n,1); cVal = zeros(n,1);
 setupTot = 0; tardTot = 0; remobTot = 0;
@@ -233,7 +172,7 @@ fprintf('  remob.    = %.2f\n', remobTot);
 fprintf('  total     = %.2f\n', breakdown.total);
 
 %% -------------------------------------------------------------
-%  8) GANTT CHART (mirrors solve_milp.m layout)
+%  5) GANTT CHART (mirrors solve_milp.m layout)
 %  -------------------------------------------------------------
 colSetup   = [0.85 0.55 0.20];
 colProcess = [0.20 0.55 0.85];
@@ -249,6 +188,7 @@ for k = 1:nSeq
     j    = sequence(k);
     yPos = nSeq - k + 1;
 
+    % --- (a) setup bar before j ---
     if k == 1
         setupStart = 0;
         setupDur   = port_setup(j);
@@ -267,6 +207,7 @@ for k = 1:nSeq
              'FontSize',8,'Color','k');
     end
 
+    % --- (b) processing bar (split on-time / late) ---
     procStart = sVal(j);
     procDur   = p(j);
     if cVal(j) <= d(j)
@@ -286,6 +227,7 @@ for k = 1:nSeq
          'HorizontalAlignment','center','VerticalAlignment','middle', ...
          'FontSize',9,'FontWeight','bold','Color','w');
 
+    % --- (c) deadline marker ---
     plot([d(j) d(j)], [yPos-yHeight/2, yPos+yHeight/2], ...
          'k--','LineWidth',1.2);
     text(d(j), yPos+yHeight/2 + 0.05, sprintf('d=%g', d(j)), ...
