@@ -4,7 +4,6 @@ function [sequence, totalCost, breakdown] = nearest_neighbor()
 %                   setup fuel cost from the current state.
 %                   In case of a tie, chooses the one with smallest TaskID.
 
-clear
 clc
 
 dbFile = 'offshore_wind.db';
@@ -44,7 +43,6 @@ sequence = zeros(1,n);
 
 % Step 1: Find first task from Port with minimum setup
 [~, firstIdx_temp] = min(port_setup(unvisited));
-% In caso ci fossero doppi minimi, min restituisce il primo indice (ID più basso tra i min)
 firstTask = unvisited(firstIdx_temp);
 
 sequence(1) = firstTask;

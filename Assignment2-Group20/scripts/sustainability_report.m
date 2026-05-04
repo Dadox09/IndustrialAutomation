@@ -1,5 +1,4 @@
 function sustainability_report(breakdown_exact, breakdown_nn, cost_exact, cost_nn)
-% SUSTAINABILITY_REPORT Confronto tra approccio ottimo e nearest neighbor.
 
 fprintf('\n======= SUSTAINABILITY REPORT =======\n');
 
@@ -47,7 +46,7 @@ ax = gca;
 ax.Toolbar.Visible = 'off';
 
 % Salvo il plot a scopi di documentazione/walkthrough
-exportgraphics(f, 'sustainability_plot.png', 'Resolution', 300);
+exportgraphics(f, '../results/sustainability_plot.png', 'Resolution', 300);
 fprintf('\nGrafico generato: "sustainability_plot.png"\n');
 fprintf('=====================================\n');
 

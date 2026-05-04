@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(python 'C:\\\\Users\\\\rizzo\\\\OneDrive\\\\Desktop\\\\AI\\\\IndustrialAutomation\\\\Assignment2-Group20\\\\_tmp_pdfread.py')",
-      "Bash(python -m pip install --quiet pypdf)"
+      "Bash(python -m pip install --quiet pypdf)",
+      "Bash(rtk grep *)"
     ]
   }
 }

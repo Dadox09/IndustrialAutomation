@@ -60,18 +60,17 @@ fprintf('\nSetup matrix S (n x n):\n'); disp(S);
 fprintf('\nFuel matrix F (raw table):\n'); disp(F_fuel);
 
 %% -------------------------------------------------------------
-%  2) SUBSETS PER STAGE (prof: X1, X2, ...; combnk == nchoosek)
+%  2) SUBSETS PER STAGE
 %  -------------------------------------------------------------
 X = cell(n,1);
 for k = 1:n
-    X{k} = nchoosek(1:n,k);   % equivalent to combnk(1:n,k)
+    X{k} = nchoosek(1:n,k);
 end
 
 %% -------------------------------------------------------------
 %  3) FORWARD PASS: enumerate reachable completion times per (S,last)
 %  -------------------------------------------------------------
-% Reach{k}{r,j} = sorted list of distinct completion times t at state
-% (X{k}(r,:), last = j) reachable from Port through any valid permutation.
+% Reach{k}{r,j} = tempo per arrivare e concludere task j
 Reach = cell(n,1);
 for k = 1:n
     Reach{k} = cell(size(X{k},1), n);
@@ -233,13 +232,13 @@ fprintf('  remob.    = %.2f\n', remobTot);
 fprintf('  total     = %.2f\n', breakdown.total);
 
 %% -------------------------------------------------------------
-%  8) GANTT CHART (mirrors solve_milp.m layout)
+%  8) GANTT CHART
 %  -------------------------------------------------------------
 colSetup   = [0.85 0.55 0.20];
 colProcess = [0.20 0.55 0.85];
 colLate    = [0.85 0.20 0.20];
 
-figure('Name','DP Gantt Chart','Color','w');
+f = figure('Name','DP Gantt Chart','Color','w');
 hold on;
 
 nSeq    = numel(sequence);
@@ -311,5 +310,7 @@ legend([hSetup hProc hLate hDead], ...
        {'Setup (port / inter-task)','Processing','Tardy portion','Deadline d_j'}, ...
        'Location','southoutside','Orientation','horizontal');
 
+exportgraphics(f, '../results/dpGantt.png', 'Resolution', 300);
+
+
 hold off;
-end

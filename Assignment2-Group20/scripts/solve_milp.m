@@ -5,7 +5,6 @@ function [sequence, totalCost, breakdown] = solve_milp()
 %   totalCost  : optimal objective value (fuel units)
 %   breakdown  : struct with setup / tardiness / remobilization components
 
-clear
 clc
 
 %% -------------------------------------------------------------
@@ -174,7 +173,28 @@ disp(xopt.c)
 fprintf('\nSequence: %s\n', strjoin(string(sequence'),' -> '));
 
 %% -------------------------------------------------------------
-%  6) GANTT CHART
+%  6) BUILD BREAKDOWN STRUCT
+%  -------------------------------------------------------------
+yVal   = round(xopt.y);
+xVal   = round(xopt.x);
+tVal   = max(0, xopt.T);
+penVal = round(xopt.penalty);
+
+breakdown.setupFromPort  = sum(port_setup .* yVal);
+btwn = 0;
+for i = 1:n
+    for j = 1:n
+        if i ~= j
+            btwn = btwn + S(i,j)*xVal(i,j);
+        end
+    end
+end
+breakdown.setupBetween   = btwn;
+breakdown.tardiness      = sum(w .* tVal);
+breakdown.remobilization = sum(fixedCost .* penVal);
+
+%% -------------------------------------------------------------
+%  7) GANTT CHART
 %  -------------------------------------------------------------
 sVal = xopt.s;          % start times
 cVal = xopt.c;          % completion times
@@ -184,7 +204,7 @@ colSetup   = [0.85 0.55 0.20];   % orange  -> setup (port + inter-task)
 colProcess = [0.20 0.55 0.85];   % blue    -> processing
 colLate    = [0.85 0.20 0.20];   % red     -> tardiness portion
 
-figure('Name','MILP Gantt Chart','Color','w');
+f = figure('Name','MILP Gantt Chart','Color','w');
 hold on;
 
 nSeq = numel(sequence);
@@ -262,5 +282,7 @@ hDead    = plot(NaN,NaN,'k--','LineWidth',1.2);
 legend([hSetup hProc hLate hDead], ...
        {'Setup (port / inter-task)','Processing','Tardy portion','Deadline d_j'}, ...
        'Location','southoutside','Orientation','horizontal');
+
+exportgraphics(f, '../results/milpGantt.png', 'Resolution', 300);
 
 hold off;
