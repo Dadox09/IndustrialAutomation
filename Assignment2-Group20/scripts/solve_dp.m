@@ -1,11 +1,6 @@
 function [sequence, totalCost, breakdown] = solve_dp()
 %
-% APPROACH B - Dynamic Programming (BACKWARD induction, prof's style)
-%
-% Mirrors the structure of principale.m:
-%   passo n  -> base case (V = 0 when all jobs done)
-%   passo k  -> backward recursion, k = n-1 .. 1
-%   passo 0  -> initial state (Port)
+% APPROACH B - Dynamic Programming
 %
 % State: (S, last, t)
 %   S    = subset of jobs already scheduled  (size k)

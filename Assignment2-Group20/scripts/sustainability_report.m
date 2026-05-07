@@ -41,11 +41,9 @@ title('Trade-off between "Moving Fast" and "Waiting"');
 legend('Setup Consumption (Fast)', 'Idle DP-Mode Penalty (Waiting)', 'Location', 'northwest');
 grid on;
 
-% Rimuoviamo la toolbar per evitare il warning in fase di esportazione
 ax = gca;
 ax.Toolbar.Visible = 'off';
 
-% Salvo il plot a scopi di documentazione/walkthrough
 exportgraphics(f, '../results/sustainability_plot.png', 'Resolution', 300);
 fprintf('\nGrafico generato: "sustainability_plot.png"\n');
 fprintf('=====================================\n');
