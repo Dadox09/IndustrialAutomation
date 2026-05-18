@@ -1,0 +1,35 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+
+\title{Method Explanation -- Group 20\\
+\large Sustainable MRP 90-Minute Challenge}
+\author{Group 20}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Forecast}
+We used multiplicative seasonal decomposition ($Y = T \cdot S \cdot R$).
+We computed monthly seasonal indices from 104 weeks of history, then removed seasonality
+from demand and fitted a linear model (\texttt{fitlm}) using \textit{WorkingDays},
+\textit{ConfirmedOrders} and \textit{EcoTenderWeek} as predictors (other variables dropped
+by backward $p$-value selection to avoid overfitting). Validation with Leave-One-Out
+jackknife gave MAPD $= 0.10\%$ (very good). Safety stock $= 1.65 \times \sigma_{\text{LOO}} \approx 2$ units.
+
+\section*{Production}
+We produce at maximum weekly capacity every week. Stockout and service-level penalties
+together amount to 430~EUR/unit, far above production cost (42~EUR/unit). Since total
+capacity is below total forecast, producing less would only increase losses.
+
+\section*{Procurement}
+We solved a linear program (\texttt{linprog}) to minimise purchase cost plus material
+holding cost, subject to: material balance with deterministic lead times, supplier weekly
+capacity caps, carbon cap $\leq 155{,}000$~kgCO$_2$ (hard constraint), and low-carbon
+mass share $\geq 35\%$ (hard constraint). Hard constraints were chosen because penalties
+are much higher than the marginal cost of complying. Result: zero sustainability penalties.
+
+\end{document}

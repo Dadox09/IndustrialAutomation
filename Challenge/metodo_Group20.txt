@@ -1,0 +1,17 @@
+GROUP 20 - Method Explanation
+
+FORECAST: We used multiplicative seasonal decomposition (Y = T * S * R, slides Lez3-7).
+We computed monthly seasonal indices from 104 weeks of history, then removed seasonality
+from demand and fitted a linear model (fitlm) using WorkingDays, ConfirmedOrders and
+EcoTenderWeek as predictors (other variables dropped by backward p-value selection to
+avoid overfitting). Validation with Leave-One-Out jackknife gave MAPD = 0.10% (very good).
+Safety stock = 1.65 * forecast error std deviation (~2 units).
+
+PRODUCTION: We produce at maximum weekly capacity every week. Reason: stockout and
+service-level penalties together are 430 EUR/unit, far above production cost (42 EUR/unit).
+Since total capacity is below total forecast, producing less would only increase losses.
+
+PROCUREMENT: We solved an LP (linprog) to minimise purchase cost + material holding cost,
+subject to: material balance with lead times, supplier weekly caps, carbon cap <= 155000
+kgCO2 (hard), and low-carbon share >= 35% (hard). Hard constraints chosen because
+penalties are much higher than the cost of complying. Result: zero sustainability penalties.

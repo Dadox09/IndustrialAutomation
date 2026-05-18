@@ -1,0 +1,194 @@
+
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{amsmath,amssymb,booktabs,array,enumitem,xcolor,hyperref}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\hypersetup{colorlinks=true,linkcolor=black,urlcolor=blue}
+\setlist[itemize]{topsep=2pt,itemsep=2pt}
+\setlist[enumerate]{topsep=2pt,itemsep=2pt}
+\newcommand{\COtwo}{\mathrm{CO_2e}}
+
+\title{90-Minute Sustainable Material Resource Planning Challenge\\
+\large Industrial Automation - First Year Master in Computer Engineering}
+\author{Instructor: \textit{[your name]}}
+\date{Deadline: \textit{[insert classroom deadline]}}
+
+\begin{document}
+\maketitle
+
+\section*{Objective}
+You are the planning engineer of a small industrial plant assembling electric drive modules for automated production lines. Your task is to prepare a \textbf{rough but complete 12-week plan} that combines:
+\begin{itemize}
+    \item demand forecasting for the finished product;
+    \item material resource planning (MRP) for three material families;
+    \item sustainable procurement decisions using a low-carbon supplier option.
+\end{itemize}
+
+This challenge is designed for \textbf{one hour and a half}. You are not expected to find the mathematical optimum. A simple, transparent heuristic is acceptable if it gives a feasible and reasonable plan. The prize is awarded to the group with the lowest evaluation score, so better strategies still matter.
+
+\section*{Industrial Context}
+The plant produces one finished product: an electric drive module. Each unit requires three material families:
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+Material family & Role in the product \\
+\midrule
+Aluminium & housing and heat dissipation \\
+Copper & windings and connectors \\
+Recycled packaging & shipping protection \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+For each material there are two suppliers:
+\begin{itemize}
+    \item \textbf{Standard supplier}: cheaper, higher carbon impact, shorter lead time.
+    \item \textbf{Low-carbon supplier}: slightly more expensive, lower carbon impact, higher recycled content, sometimes longer lead time.
+\end{itemize}
+
+\section*{Available Files}
+Students receive:
+\begin{itemize}
+    \item \texttt{sustainable\_mrp\_90min\_student\_data.mat}
+    \item \texttt{sustainable\_mrp\_90min\_submission\_template.mat}
+    \item \texttt{load\_sustainable\_mrp\_90min\_data.m}
+\end{itemize}
+
+The instructor keeps private:
+\begin{itemize}
+    \item \texttt{sustainable\_mrp\_90min\_teacher\_hidden.mat}
+    \item \texttt{evaluate\_sustainable\_mrp\_90min\_submission.m}
+\end{itemize}
+
+\section*{Data Description}
+The student data file contains:
+\begin{itemize}
+    \item 104 historical weeks of demand and exogenous variables;
+    \item 12 target weeks of exogenous variables;
+    \item bill of materials, supplier costs, supplier emissions, lead times, capacities, and initial inventories.
+\end{itemize}
+
+The target demand is hidden and is used only by the instructor for evaluation.
+
+\subsection*{Exogenous Variables}
+The matrices \texttt{histX} and \texttt{targetX} have the following columns:
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+Column & Meaning \\
+\midrule
+\texttt{WeekOfYear} & Calendar week number \\
+\texttt{Month} & Calendar month \\
+\texttt{WorkingDays} & Productive working days in the week \\
+\texttt{ConfirmedOrders} & Orders already visible at the beginning of the week \\
+\texttt{IndustrialIndex} & Industrial market activity index \\
+\texttt{EcoTenderWeek} & 1 if a green/public tender campaign is active \\
+\texttt{SupplierRiskIndex} & Supply-chain risk indicator \\
+\texttt{PlannedMaintenance} & 1 if production capacity is reduced \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section*{Decision Variables}
+For the 12 target weeks, submit:
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Variable & Size & Meaning \\
+\midrule
+\texttt{demandForecast} & $12\times 1$ & Forecast of weekly finished-product demand \\
+\texttt{productionPlan} & $12\times 1$ & Planned production quantity in units \\
+\texttt{purchaseOrderQty} & $12\times 3\times 2$ & Material orders in kg: week, material, supplier \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+All values must be nonnegative real numbers.
+
+\section*{Simplified MRP Logic}
+Let $t=1,\ldots,12$ be the target weeks, $m=1,2,3$ the materials, and $s=1,2$ the suppliers. The bill of materials is $a_m$ kg/unit.
+
+A simple finished-goods balance based on your forecast is:
+\begin{equation}
+I^F_t = I^F_{t-1} + p_t - \widehat d_t,
+\end{equation}
+where $I^F_t$ is finished-product inventory, $p_t$ is production, and $\widehat d_t$ is forecast demand.
+
+A simple material requirement for week $t$ is:
+\begin{equation}
+R_{tm} = a_m p_t.
+\end{equation}
+
+Material ordered in week $t$ from supplier $s$ arrives after the deterministic lead time given in the data file. Initial material inventory is provided, so you do not need a sophisticated initialization method.
+
+\section*{Sustainability Requirements}
+Your plan should consider two sustainability indicators:
+\begin{enumerate}
+    \item \textbf{Carbon emissions:}
+    \begin{equation}
+    \sum_{t,m,s} q_{tms} c_{ms} \le C^{\max},
+    \end{equation}
+    where $q_{tms}$ is the order quantity and $c_{ms}$ is kg $\COtwo$/kg.
+    \item \textbf{Low-carbon sourcing share:}
+    \begin{equation}
+    \frac{\sum_{t,m} q_{tm,\mathrm{LowCarbon}}}{\sum_{t,m,s} q_{tms}} \ge 0.35.
+    \end{equation}
+\end{enumerate}
+
+These requirements are evaluated as soft constraints: violating them increases the score, but a submitted plan is still accepted.
+
+\section*{Suggested Baseline Method}
+The following baseline is intentionally simple and should be possible in the available time:
+\begin{enumerate}
+    \item Forecast the 12 target demands using linear regression, moving average with correction, or any fast method using \texttt{histDemand}, \texttt{histX}, and \texttt{targetX}.
+    \item Set a target safety stock, for example 5--10\% of average weekly demand.
+    \item Build production week by week. For a fast robust solution, produce close to the forecast plus safety stock:
+    \begin{equation}
+    p_t = \min\{\mathrm{capacity}_t,\widehat d_t + SS\}.
+    \end{equation}
+    A more refined solution may reduce production when finished-goods inventory is already high.
+    \item Convert production into material requirements using the bill of materials.
+    \item Split each material order between the two suppliers. A simple starting point is 60\% Standard and 40\% LowCarbon. Increase the LowCarbon share if the carbon cap is exceeded; decrease it only if cost becomes excessive.
+    \item Shift orders earlier according to supplier lead times when possible. For a rough solution, ordering the material needed for weeks $t+1$ and $t+2$ is acceptable.
+\end{enumerate}
+
+A complete heuristic solution is more important than a sophisticated but unfinished model.
+
+\section*{Evaluation Score}
+The instructor evaluates your submitted plan using the true hidden target demand. The score includes:
+\begin{itemize}
+    \item purchasing cost;
+    \item production cost;
+    \item finished-goods and material holding cost;
+    \item stockout penalty if the true demand cannot be served;
+    \item penalty for production above weekly capacity;
+    \item emergency material penalty if production requires materials not available in time;
+    \item carbon-cap penalty;
+    \item low-carbon-share penalty;
+    \item service-level penalty if less than 92\% of demand is served.
+\end{itemize}
+
+Lower score is better. The scoring function rewards plans that are reasonable, robust, and sustainable, not just cheap.
+
+\section*{Submission}
+Submit one MATLAB file named:
+\begin{verbatim}
+submission_GROUPNAME.mat
+\end{verbatim}
+containing exactly:
+\begin{itemize}
+    \item \texttt{demandForecast}
+    \item \texttt{productionPlan}
+    \item \texttt{purchaseOrderQty}
+\end{itemize}
+
+Also submit a short explanation of your method, maximum \textbf{10-15 lines}. Include only the main forecasting method, production rule, ordering rule, and sustainability rule.
+
+\section*{Allowed Tools}
+You may use MATLAB, Python, Excel, AI tools, or any other software. However, the final submission must have the MATLAB variables and dimensions specified above.
+
+\section*{Why This Is AI-Resistant}
+AI tools can propose generic MRP formulas, but they cannot know the hidden target demand used by the evaluator. The quality of the solution depends on how well you use the specific numerical data, capacities, inventories, and sustainability trade-offs in the provided file. A direct AI answer that ignores the numerical file will usually produce a weak plan; the best groups will adapt their heuristic to the actual demand pattern, capacity bottleneck, lead times, and sustainability penalties.
+
+\end{document}
